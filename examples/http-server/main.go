@@ -40,7 +40,7 @@ func main() {
 }
 
 func createWAF() coraza.WAF {
-	directivesFile := "./default.conf"
+	directivesFile := "/Users/1usir/works/coraza/coraza/examples/http-server/testdata"
 	if s := os.Getenv("DIRECTIVES_FILE"); s != "" {
 		directivesFile = s
 	}
@@ -48,7 +48,7 @@ func createWAF() coraza.WAF {
 	waf, err := coraza.NewWAF(
 		coraza.NewWAFConfig().
 			WithErrorCallback(logError).
-			WithDirectivesFromFile(directivesFile),
+			WithDirectivesFromDir(directivesFile),
 	)
 	if err != nil {
 		log.Fatal(err)

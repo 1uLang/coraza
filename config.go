@@ -4,12 +4,13 @@
 package coraza
 
 import (
-	"io/fs"
-
 	"github.com/corazawaf/coraza/v3/debuglog"
 	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
 	"github.com/corazawaf/coraza/v3/internal/corazawaf"
 	"github.com/corazawaf/coraza/v3/types"
+	"io/fs"
+	"os"
+	"path/filepath"
 )
 
 // WAFConfig controls the behavior of the WAF.
@@ -21,6 +22,8 @@ type WAFConfig interface {
 
 	// WithDirectivesFromFile parses the directives from the given file and adds them to the WAF.
 	WithDirectivesFromFile(path string) WAFConfig
+
+	WithDirectivesFromDir(dir string) WAFConfig
 
 	// WithRequestBodyAccess enables access to the request body.
 	WithRequestBodyAccess() WAFConfig
@@ -122,6 +125,19 @@ func (c *wafConfig) WithRules(rules ...*corazawaf.Rule) WAFConfig {
 func (c *wafConfig) WithDirectivesFromFile(path string) WAFConfig {
 	ret := c.clone()
 	ret.rules = append(ret.rules, wafRule{file: path})
+	return ret
+}
+func (c *wafConfig) WithDirectivesFromDir(dir string) WAFConfig {
+	ret := c.clone()
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() && filepath.Ext(path) == ".conf" {
+			ret.rules = append(ret.rules, wafRule{file: path})
+		}
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
 	return ret
 }
 
