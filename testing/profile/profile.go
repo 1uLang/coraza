@@ -74,6 +74,7 @@ type ExpectedInterruption struct {
 	Action string `yaml:"action,omitempty"`
 	Status int    `yaml:"status,omitempty"`
 	Data   string `yaml:"data,omitempty"`
+	Msg    string `yaml:"msg,omitempty"`
 }
 
 // Profiles is a map of registered profiles used by test runners

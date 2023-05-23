@@ -175,6 +175,9 @@ type Interruption struct {
 
 	// Parameters used by proxy and redirect
 	Data string
+
+	// return notice msg
+	Msg string
 }
 
 // BodyBufferOptions is used to feed a coraza.BodyBuffer with parameters

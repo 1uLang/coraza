@@ -144,6 +144,7 @@ func WrapHandler(waf coraza.WAF, h http.Handler) http.Handler {
 			return
 		} else if it != nil {
 			w.WriteHeader(obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK))
+			w.Write([]byte("触发CRS规则：" + it.Msg))
 			return
 		}
 
