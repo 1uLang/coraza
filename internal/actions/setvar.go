@@ -36,9 +36,9 @@ func (a *setvarFn) Init(_ plugintypes.RuleMetadata, data string) error {
 	colKey, colVal, colOk := strings.Cut(key, ".")
 	// Right not it only makes sense to allow setting TX
 	// key is also required
-	if strings.ToUpper(colKey) != "TX" {
-		return errors.New("invalid arguments, expected collection TX")
-	}
+	//if strings.ToUpper(colKey) != "TX" {
+	//	return errors.New("invalid arguments, expected collection TX")
+	//}
 	if strings.TrimSpace(colVal) == "" {
 		return errors.New("invalid arguments, expected syntax TX.{key}={value}")
 	}
