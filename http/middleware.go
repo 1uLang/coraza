@@ -148,7 +148,7 @@ func WrapHandler(waf coraza.WAF, h http.Handler) http.Handler {
 			return
 		}
 
-		ww, processResponse := wrap(w, r, tx)
+		ww, processResponse := Wrap(w, r, tx)
 
 		// We continue with the other middlewares by catching the response
 		h.ServeHTTP(ww, r)
