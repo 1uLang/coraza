@@ -356,12 +356,16 @@ func (r *Rule) doEvaluate(phase types.RulePhase, tx *Transaction, collectiveMatc
 				// Flow actions are evaluated also if the rule engine is set to DetectionOnly
 				tx.DebugLogger().Debug().Int("rule_id", rid).Str("action", a.Name).Int("phase", int(phase)).Msg("Evaluating flow action for rule")
 				a.Function.Evaluate(r, tx)
-				tx.interruption.Msg = r.Msg.String()
+				if tx.interruption != nil {
+					tx.interruption.Msg = r.Msg.String()
+				}
 			} else if a.Function.Type() == plugintypes.ActionTypeDisruptive && tx.RuleEngine == types.RuleEngineOn {
 				// The parser enforces that the disruptive action is just one per rule (if more than one, only the last one is kept)
 				tx.DebugLogger().Debug().Int("rule_id", rid).Str("action", a.Name).Msg("Executing disruptive action for rule")
 				a.Function.Evaluate(r, tx)
-				tx.interruption.Msg = r.Msg.String()
+				if tx.interruption != nil {
+					tx.interruption.Msg = r.Msg.String()
+				}
 			}
 		}
 		if r.ID_ != noID {
