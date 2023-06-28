@@ -3,8 +3,7 @@ name: Performance Regression Check
 on:
   push:
     branches:
-      - v3/dev
-      - v3/main
+      - main
     paths-ignore:
       - "**/*.md"
       - "LICENSE"
@@ -16,19 +15,25 @@ jobs:
   benchmark:
     name: Performance regression check
     runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: '>=1.18.0'      
+          go-version: '>=1.19.0'      
       - name: Install dependencies
         run: go get ./...
       # Run benchmark with `go test -bench` and stores the output to a file
       - name: Run benchmark
-        run: go test -bench=. ./... | tee output.txt
+        run: |
+          go test -bench=. ./... | tee output.txt
+          exit ${PIPESTATUS[0]}
       # Download previous benchmark result from cache (if exists)
       - name: Download previous benchmark data
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: ./cache
           key: ${{ runner.os }}-benchmark

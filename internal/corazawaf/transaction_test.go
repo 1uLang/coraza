@@ -430,29 +430,6 @@ func TestAuditLog(t *testing.T) {
 	}
 }
 
-func TestParseAuditLog(t *testing.T) {
-	AuditLogParts, err := types.ParseAuditLogParts("ABCDEFGHIJK")
-	if err != nil {
-		t.Error("unexpected audit log parts")
-	}
-	expected := types.AuditLogParts("ABCDEFGHIJK")
-	if len(AuditLogParts) != len(expected) {
-		t.Error("AuditLogParts has different length than expected")
-
-	}
-	for i := 0; i < len(AuditLogParts); i++ {
-		if AuditLogParts[i] != expected[i] {
-			t.Errorf("Byte at position %d differs", i)
-		}
-	}
-}
-func TestInvalidAuditLog(t *testing.T) {
-	AuditLogParts, err := types.ParseAuditLogParts("ABCDEFGHIJKLMN")
-	if err == nil || len(AuditLogParts) != 0 {
-		t.Error("AuditLogParts should fail of invalid part")
-	}
-}
-
 var responseBodyWriters = map[string]func(tx *Transaction, body string) (*types.Interruption, int, error){
 	"WriteResponsequestBody": func(tx *Transaction, body string) (*types.Interruption, int, error) {
 		return tx.WriteResponseBody([]byte(body))
@@ -764,7 +741,7 @@ func TestLogCallback(t *testing.T) {
 			waf := NewWAF()
 			buffer := ""
 			waf.SetErrorCallback(func(mr types.MatchedRule) {
-				buffer = mr.ErrorLog(403)
+				buffer = mr.ErrorLog()
 			})
 			waf.RuleEngine = testCase.engineStatus
 			tx := waf.NewTransaction()
@@ -1106,7 +1083,6 @@ func TestTxSetServerName(t *testing.T) {
 	if want, have := "SetServerName has been called after ProcessRequestHeaders", logEntries[0]; !strings.Contains(have, want) {
 		t.Fatalf("unexpected message, want %q, have %q", want, have)
 	}
-
 }
 
 func TestTxAddArgument(t *testing.T) {
@@ -1400,7 +1376,73 @@ func TestTxAddResponseArgs(t *testing.T) {
 	waf := NewWAF()
 	tx := waf.NewTransaction()
 	tx.AddResponseArgument("samplekey", "samplevalue")
-	t.Log("This is a placeholder for tx.AddResponseArgs")
+	if tx.variables.responseArgs.Get("samplekey")[0] != "samplevalue" {
+		t.Errorf("failed to add response argument")
+	}
+}
+
+func TestAddGetArgsWithOverlimit(t *testing.T) {
+	testCases := []int{1, 2, 5, 1000}
+
+	for _, limit := range testCases {
+		waf := NewWAF()
+		tx := waf.NewTransaction()
+		tx.WAF.ArgumentLimit = limit
+		for i := 0; i < limit+1; i++ {
+			tx.AddGetRequestArgument(fmt.Sprintf("testKey%d", i), "samplevalue")
+		}
+		if tx.variables.argsGet.Len() > waf.ArgumentLimit {
+			t.Fatal("Argument limit is failed while add get args")
+		}
+	}
+}
+
+func TestAddPostArgsWithOverlimit(t *testing.T) {
+	testCases := []int{1, 2, 5, 1000}
+
+	for _, limit := range testCases {
+		waf := NewWAF()
+		tx := waf.NewTransaction()
+		tx.WAF.ArgumentLimit = limit
+		for i := 0; i < limit+1; i++ {
+			tx.AddPostRequestArgument(fmt.Sprintf("testKey%d", i), "samplevalue")
+		}
+		if tx.variables.argsPost.Len() > waf.ArgumentLimit {
+			t.Fatal("Argument limit is failed while add post args")
+		}
+	}
+}
+
+func TestAddPathArgsWithOverlimit(t *testing.T) {
+	testCases := []int{1, 2, 5, 1000}
+
+	for _, limit := range testCases {
+		waf := NewWAF()
+		tx := waf.NewTransaction()
+		tx.WAF.ArgumentLimit = limit
+		for i := 0; i < limit+1; i++ {
+			tx.AddPathRequestArgument(fmt.Sprintf("testKey%d", i), "samplevalue")
+		}
+		if tx.variables.argsPath.Len() > waf.ArgumentLimit {
+			t.Fatal("Argument limit is failed while add path args")
+		}
+	}
+}
+
+func TestAddResponseArgsWithOverlimit(t *testing.T) {
+	testCases := []int{1, 2, 5, 1000}
+
+	for _, limit := range testCases {
+		waf := NewWAF()
+		tx := waf.NewTransaction()
+		tx.WAF.ArgumentLimit = limit
+		for i := 0; i < limit+1; i++ {
+			tx.AddResponseArgument(fmt.Sprintf("testKey%d", i), "samplevalue")
+		}
+		if tx.variables.responseArgs.Len() > waf.ArgumentLimit {
+			t.Fatal("Argument limit is failed while add response args")
+		}
+	}
 }
 
 func TestResponseBodyForceProcessing(t *testing.T) {

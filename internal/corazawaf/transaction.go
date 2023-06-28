@@ -640,26 +640,42 @@ func (tx *Transaction) ExtractGetArguments(uri string) {
 
 // AddGetRequestArgument
 func (tx *Transaction) AddGetRequestArgument(key string, value string) {
-	// TODO implement ARGS value limit using ArgumentsLimit
+	if tx.checkArgumentLimit(tx.variables.argsGet) {
+		tx.debugLogger.Warn().Msg("skipping get request argument, over limit")
+		return
+	}
 	tx.variables.argsGet.Add(key, value)
 }
 
 // AddPostRequestArgument
 func (tx *Transaction) AddPostRequestArgument(key string, value string) {
-	// TODO implement ARGS value limit using ArgumentsLimit
+	if tx.checkArgumentLimit(tx.variables.argsPost) {
+		tx.debugLogger.Warn().Msg("skipping post request argument, over limit")
+		return
+	}
 	tx.variables.argsPost.Add(key, value)
 }
 
 // AddPathRequestArgument
 func (tx *Transaction) AddPathRequestArgument(key string, value string) {
-	// TODO implement ARGS value limit using ArgumentsLimit
+	if tx.checkArgumentLimit(tx.variables.argsPath) {
+		tx.debugLogger.Warn().Msg("skipping path request argument, over limit")
+		return
+	}
 	tx.variables.argsPath.Add(key, value)
+}
+
+func (tx *Transaction) checkArgumentLimit(c *collections.NamedCollection) bool {
+	return c.Len() >= tx.WAF.ArgumentLimit
 }
 
 // AddResponseArgument
 func (tx *Transaction) AddResponseArgument(key string, value string) {
-	// TODO implement ARGS value limit using ArgumentsLimit
-	// tx.variables.argsResponse.Add(key, value)
+	if tx.variables.responseArgs.Len() >= tx.WAF.ArgumentLimit {
+		tx.debugLogger.Warn().Msg("skipping response argument, over limit")
+		return
+	}
+	tx.variables.responseArgs.Add(key, value)
 }
 
 // ProcessURI Performs the analysis on the URI and all the query string variables.
@@ -1303,41 +1319,42 @@ func (tx *Transaction) LastPhase() types.RulePhase {
 	return tx.lastPhase
 }
 
-// AuditLog returns an AuditLog struct, used to write audit logs
+// AuditLog returns an AuditLog struct, used to write audit logs.
+// It implies the log parts starts with A and ends with Z as in the
+// types.ParseAuditLogParts.
 func (tx *Transaction) AuditLog() *auditlog.Log {
 	al := &auditlog.Log{}
 	al.Parts_ = tx.AuditLogParts
 
-	var alTransaction auditlog.Transaction
+	clientPort, _ := strconv.Atoi(tx.variables.remotePort.Get())
+	hostPort, _ := strconv.Atoi(tx.variables.serverPort.Get())
+	// YYYY/MM/DD HH:mm:ss
+	ts := time.Unix(0, tx.Timestamp).Format("2006/01/02 15:04:05")
+	al.Transaction_ = auditlog.Transaction{
+		Timestamp_:     ts,
+		UnixTimestamp_: tx.Timestamp,
+		ID_:            tx.id,
+		ClientIP_:      tx.variables.remoteAddr.Get(),
+		ClientPort_:    clientPort,
+		HostIP_:        tx.variables.serverAddr.Get(),
+		HostPort_:      hostPort,
+		ServerID_:      tx.variables.serverName.Get(), // TODO check
+	}
+
 	for _, part := range tx.AuditLogParts {
 		switch part {
-		case types.AuditLogPartAuditLogHeader:
-			clientPort, _ := strconv.Atoi(tx.variables.remotePort.Get())
-			hostPort, _ := strconv.Atoi(tx.variables.serverPort.Get())
-			// YYYY/MM/DD HH:mm:ss
-			ts := time.Unix(0, tx.Timestamp).Format("2006/01/02 15:04:05")
-			alTransaction = auditlog.Transaction{
-				Timestamp_:     ts,
-				UnixTimestamp_: tx.Timestamp,
-				ID_:            tx.id,
-				ClientIP_:      tx.variables.remoteAddr.Get(),
-				ClientPort_:    clientPort,
-				HostIP_:        tx.variables.serverAddr.Get(),
-				HostPort_:      hostPort,
-				ServerID_:      tx.variables.serverName.Get(), // TODO check
-			}
 		case types.AuditLogPartRequestHeaders:
-			if alTransaction.Request_ == nil {
-				alTransaction.Request_ = &auditlog.TransactionRequest{}
+			if al.Transaction_.Request_ == nil {
+				al.Transaction_.Request_ = &auditlog.TransactionRequest{}
 			}
-			alTransaction.Request_.Headers_ = tx.variables.requestHeaders.Data()
+			al.Transaction_.Request_.Headers_ = tx.variables.requestHeaders.Data()
 		case types.AuditLogPartRequestBody:
-			if alTransaction.Request_ == nil {
-				alTransaction.Request_ = &auditlog.TransactionRequest{}
+			if al.Transaction_.Request_ == nil {
+				al.Transaction_.Request_ = &auditlog.TransactionRequest{}
 			}
 			// TODO maybe change to:
 			// al.Transaction.Request.Body = tx.RequestBodyBuffer.String()
-			alTransaction.Request_.Body_ = tx.variables.requestBody.Get()
+			al.Transaction_.Request_.Body_ = tx.variables.requestBody.Get()
 
 			/*
 			* TODO:
@@ -1349,7 +1366,7 @@ func (tx *Transaction) AuditLog() *auditlog.Log {
 			 */
 			// upload data
 			var files []plugintypes.AuditLogTransactionRequestFiles
-			alTransaction.Request_.Files_ = nil
+			al.Transaction_.Request_.Files_ = nil
 			for _, file := range tx.variables.files.Get("") {
 				var size int64
 				if fs := tx.variables.filesSizes.Get(file); len(fs) > 0 {
@@ -1364,21 +1381,21 @@ func (tx *Transaction) AuditLog() *auditlog.Log {
 				}
 				files = append(files, at)
 			}
-			alTransaction.Request_.Files_ = files
+			al.Transaction_.Request_.Files_ = files
 		case types.AuditLogPartIntermediaryResponseBody:
-			if alTransaction.Response_ == nil {
-				alTransaction.Response_ = &auditlog.TransactionResponse{}
+			if al.Transaction_.Response_ == nil {
+				al.Transaction_.Response_ = &auditlog.TransactionResponse{}
 			}
-			alTransaction.Response_.Body_ = tx.variables.responseBody.Get()
+			al.Transaction_.Response_.Body_ = tx.variables.responseBody.Get()
 		case types.AuditLogPartResponseHeaders:
-			if alTransaction.Response_ == nil {
-				alTransaction.Response_ = &auditlog.TransactionResponse{}
+			if al.Transaction_.Response_ == nil {
+				al.Transaction_.Response_ = &auditlog.TransactionResponse{}
 			}
 			status, _ := strconv.Atoi(tx.variables.responseStatus.Get())
-			alTransaction.Response_.Status_ = status
-			alTransaction.Response_.Headers_ = tx.variables.responseHeaders.Data()
+			al.Transaction_.Response_.Status_ = status
+			al.Transaction_.Response_.Headers_ = tx.variables.responseHeaders.Data()
 		case types.AuditLogPartAuditLogTrailer:
-			alTransaction.Producer_ = &auditlog.TransactionProducer{
+			al.Transaction_.Producer_ = &auditlog.TransactionProducer{
 				Connector_:  tx.WAF.ProducerConnector,
 				Version_:    tx.WAF.ProducerConnectorVersion,
 				Server_:     "",
@@ -1413,7 +1430,6 @@ func (tx *Transaction) AuditLog() *auditlog.Log {
 		}
 	}
 
-	al.Transaction_ = alTransaction
 	return al
 }
 
@@ -1458,8 +1474,7 @@ func (tx *Transaction) String() string {
 	res := strings.Builder{}
 	res.WriteString("\n\n----------------------- ERRORLOG ----------------------\n")
 	for _, mr := range tx.matchedRules {
-		status, _ := strconv.Atoi(tx.variables.responseStatus.Get())
-		res.WriteString(mr.ErrorLog(status))
+		res.WriteString(mr.ErrorLog())
 		res.WriteString("\n\n----------------------- MATCHDATA ---------------------\n")
 		for _, md := range mr.MatchedDatas() {
 			fmt.Fprintf(&res, "%+v\n", md)
