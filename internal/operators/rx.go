@@ -7,8 +7,10 @@ package operators
 
 import (
 	"fmt"
+	"github.com/dlclark/regexp2"
 	"regexp"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"rsc.io/binaryregexp"
@@ -33,6 +35,9 @@ func newRX(options plugintypes.OperatorOptions) (plugintypes.Operator, error) {
 		// not match unicode, meaning we cannot support expressions with both unicode and non-utf8
 		// matches. This should not be commonly needed.
 		return newBinaryRX(options)
+	}
+	if matchesPerlStyleRegexp(data) {
+		return newRX2(options)
 	}
 
 	re, err := regexp.Compile(data)
@@ -133,4 +138,43 @@ func matchesArbitraryBytes(expr string) bool {
 	}
 
 	return !utf8.Valid(decoded)
+}
+
+type rx2 struct {
+	re *regexp2.Regexp
+}
+
+func newRX2(options plugintypes.OperatorOptions) (plugintypes.Operator, error) {
+	data := options.Arguments
+
+	re, err := regexp2.Compile(data, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &rx2{re: re}, nil
+}
+
+func (o *rx2) Evaluate(tx plugintypes.TransactionState, value string) bool {
+
+	if tx.Capturing() {
+		m, err := o.re.FindStringMatch(value)
+		if err != nil {
+			return false
+		}
+		var i = 0
+		for m != nil && i < 9 {
+			m, _ = o.re.FindNextMatch(m)
+			tx.CaptureField(i, m.String())
+			i++
+		}
+		return true
+	} else {
+		ok, _ := o.re.MatchString(value)
+		return ok
+	}
+}
+
+func matchesPerlStyleRegexp(expr string) bool {
+	// (?< Perl风格的lookbehind断言 标准regexp 不支持该风格的正则
+	return strings.Contains(expr, "(?")
 }
