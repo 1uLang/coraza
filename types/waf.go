@@ -122,6 +122,9 @@ var validOpts = map[AuditLogPart]struct{}{
 
 // ParseAuditLogParts parses the audit log parts
 func ParseAuditLogParts(opts string) (AuditLogParts, error) {
+	if opts == "+E" {
+		opts = "AEZ"
+	}
 	if !strings.HasPrefix(opts, "A") {
 		return nil, errors.New("audit log parts is required to start with A")
 	}

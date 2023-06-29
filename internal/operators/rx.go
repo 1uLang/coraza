@@ -161,11 +161,13 @@ func (o *rx2) Evaluate(tx plugintypes.TransactionState, value string) bool {
 		if err != nil {
 			return false
 		}
-		var i = 0
-		for m != nil && i < 9 {
+		var idx = 0
+		for m != nil && idx < 9 {
+			for i := 0; i < m.GroupCount() && idx < 9; i++ {
+				tx.CaptureField(idx, m.GroupByNumber(i).String())
+				idx++
+			}
 			m, _ = o.re.FindNextMatch(m)
-			tx.CaptureField(i, m.String())
-			i++
 		}
 		return true
 	} else {
