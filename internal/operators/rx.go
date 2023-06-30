@@ -158,7 +158,7 @@ func (o *rx2) Evaluate(tx plugintypes.TransactionState, value string) bool {
 
 	if tx.Capturing() {
 		m, err := o.re.FindStringMatch(value)
-		if err != nil {
+		if err != nil || m == nil {
 			return false
 		}
 		var idx = 0
